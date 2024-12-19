@@ -36,3 +36,27 @@ Total price expected:​ £16.61
 
 Basket: GR1,CF1,SR1,CF1,CF1
 Total price expected:​ £30.57
+
+# Version 1 Assumptions 
+
+We assume that the pricing rules follow the below structure
+
+```
+PRICING_RULES={
+'GR1' => {
+type: 'BOGO',
+threshold: 2,
+value: 0
+},
+'SR1' => {
+type: 'price',
+threshold: 3,
+value: 4.50
+},
+'CF1' => {
+type: 'percentage',
+threshold: 3,
+value: 0.666
+}
+}
+```
