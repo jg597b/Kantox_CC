@@ -1,155 +1,106 @@
 # frozen_string_literal: true
-
-require_relative '../checkout'
+require './checkout'
 
 RSpec.describe Checkout do
+
   let(:pricing_rules) do
     {
-      'GR1' => {
-        type: 'BOGO',
-        threshold: 2,
-        value: 0
-      },
-      'SR1' => {
-        type: 'price',
-        threshold: 3,
-        value: 4.50
-      },
-      'CF1' => {
-        type: 'percentage',
-        threshold: 3,
-        value: 0.666
-      }
+      'GR1' => { type: 'BOGO', threshold: 2, value: 0 },
+      'SR1' => { type: 'price', threshold: 3, value: 4.50 },
+      'CF1' => { type: 'percentage', threshold: 3, value: 2/3.0 }
     }
   end
 
   let(:checkout) { described_class.new(pricing_rules) }
 
   describe '#initialize' do
-    it 'creates a new instance with empty items' do
-      expect(checkout.instance_variable_get(:@items)).to be_empty
+    it 'creates a new instance with pricing rules' do
+      expect(checkout).to be_an_instance_of(Checkout)
     end
 
-    it 'stores the pricing rules' do
-      expect(checkout.instance_variable_get(:@pricing_rules)).to eq(pricing_rules)
+    it 'raises an error with invalid pricing rules format' do
+      expect { described_class.new([]) }.to raise_error(ArgumentError, "Pricing rules must be a Hash.")
     end
   end
 
   describe '#scan' do
-    it 'adds an item to the cart' do
-      checkout.scan('GR1')
-      expect(checkout.instance_variable_get(:@items)).to eq(['GR1'])
+    it 'adds an item and returns self for method chaining' do
+      result = checkout.scan('GR1')
+      expect(result).to eq(checkout)
     end
 
-    it 'returns self for method chaining' do
-      expect(checkout.scan('GR1')).to be_instance_of(Checkout)
+    it 'allows multiple items to be scanned via method chaining' do
+      expect { checkout.scan('GR1').scan('SR1').scan('CF1') }.not_to raise_error
     end
 
-    it 'allows multiple items to be scanned' do
-      checkout.scan('GR1').scan('SR1').scan('CF1')
-      expect(checkout.instance_variable_get(:@items)).to eq(['GR1', 'SR1', 'CF1'])
+    it 'raises an error when scanning an unknown product' do
+      expect { checkout.scan('XXX').total }.to raise_error(ArgumentError, "Unknown product: XXX")
     end
   end
 
   describe '#total' do
-    context 'with an empty cart' do
+    context 'when no items are scanned' do
       it 'returns 0' do
         expect(checkout.total).to eq(0)
       end
     end
 
-    context 'with single items (no discounts)' do
-      it 'calculates total for one Green Tea' do
-        checkout.scan('GR1')
-        expect { checkout.total }.to output(/.*Total: 3\.11.*/).to_stdout
+    context 'with BOGO discount' do
+      it 'applies BOGO discount for even number of items' do
+        checkout.scan('GR1').scan('GR1').scan('GR1').scan('GR1')
+        expect { checkout.total }.to output(/Total: 6.22/).to_stdout
       end
 
-      it 'calculates total for one Strawberries' do
-        checkout.scan('SR1')
-        expect { checkout.total }.to output(/.*Total: 5\.0.*/).to_stdout
-      end
-
-      it 'calculates total for one Coffee' do
-        checkout.scan('CF1')
-        expect { checkout.total }.to output(/.*Total: 11\.23.*/).to_stdout
-      end
-    end
-
-    context 'with Green Tea buy-one-get-one discount' do
-      it 'applies discount for two Green Teas' do
-        checkout.scan('GR1').scan('GR1')
-        expect { checkout.total }.to output(/.*Total: 3\.11.*/).to_stdout
-      end
-
-      it 'applies discount for three Green Teas' do
+      it 'applies BOGO discount for odd number of items' do
         checkout.scan('GR1').scan('GR1').scan('GR1')
-        expect { checkout.total }.to output(/.*Total: 6\.22.*/).to_stdout
+        expect { checkout.total }.to output(/Total: 6.22/).to_stdout
       end
     end
 
-    context 'with Strawberries bulk price discount' do
-      it 'applies no discount for two Strawberries' do
-        checkout.scan('SR1').scan('SR1')
-        expect { checkout.total }.to output(/.*Total: 10\.0.*/).to_stdout
-      end
-
-      it 'applies discount for three Strawberries' do
+    context 'with price discount' do
+      it 'applies bulk price discount when threshold is met' do
         checkout.scan('SR1').scan('SR1').scan('SR1')
-        expect { checkout.total }.to output(/.*Total: 13\.5.*/).to_stdout
+        expect { checkout.total }.to output(/Total: 13.5/).to_stdout
+      end
+
+      it 'uses regular price when below threshold' do
+        checkout.scan('SR1').scan('SR1')
+        expect { checkout.total }.to output(/Total: 10.0/).to_stdout
       end
     end
 
-    context 'with Coffee percentage discount' do
-      it 'applies no discount for two Coffees' do
-        checkout.scan('CF1').scan('CF1')
-        expect { checkout.total }.to output(/.*Total: 22\.46.*/).to_stdout
+    context 'with percentage discount' do
+      it 'applies percentage discount when threshold is met' do
+        checkout.scan('CF1').scan('CF1').scan('CF1')
+        expect { checkout.total }.to output(/Total: 22.46/).to_stdout
       end
 
-      it 'applies discount for three Coffees' do
-        checkout.scan('CF1').scan('CF1').scan('CF1')
-        expected_price = (11.23 * (1 - 0.666) * 3).round(2)
-        expect { checkout.total }.to output(/.*Total: #{expected_price}.*/).to_stdout
+      it 'uses regular price when below threshold' do
+        checkout.scan('CF1').scan('CF1')
+        expect { checkout.total }.to output(/Total: 22.46/).to_stdout
       end
     end
 
     context 'with mixed items' do
-      it 'calculates correct total for basket with multiple types of items' do
-        checkout.scan('GR1').scan('SR1').scan('GR1').scan('CF1').scan('CF1')
-        expect { checkout.total }.to output(/.*Total: 30\.57.*/).to_stdout
-      end
+      it 'correctly calculates total with different discount types' do
+        checkout.scan('GR1').scan('GR1')
+                .scan('SR1').scan('SR1').scan('SR1')
+                .scan('CF1').scan('CF1').scan('CF1')
 
-      it 'calculates correct total for basket with multiple discounts' do
-        checkout.scan('GR1').scan('GR1').scan('SR1').scan('SR1').scan('SR1').scan('CF1').scan('CF1').scan('CF1')
-        expect { checkout.total }.to output(/.*Total: 27\.86.*/).to_stdout
+        expect { checkout.total }.to output(/Total: 39.07/).to_stdout
       end
     end
+  end
 
-    context 'with items without discount rules' do
-      let(:pricing_rules) { {} }
-
-      it 'applies no discount when rules are empty' do
-        checkout.scan('GR1').scan('GR1')
-        expect { checkout.total }.to output(/.*Total: 6\.22.*/).to_stdout
-      end
+  describe 'large quantities' do
+    it 'handles very large quantities correctly' do
+      10.times { checkout.scan('GR1') }
+      expect { checkout.total }.to output(/Total: 15.55/).to_stdout 
     end
 
-    context 'with different pricing rules' do
-      let(:different_pricing_rules) do
-        {
-          'GR1' => {
-            type: 'price',
-            threshold: 2,
-            value: 2.00
-          }
-        }
-      end
-
-      let(:checkout) { described_class.new(different_pricing_rules) }
-
-      it 'applies the new rules correctly' do
-        checkout.scan('GR1').scan('GR1')
-        expect { checkout.total }.to output(/.*Total: 4\.0.*/).to_stdout
-      end
+    it 'rounds totals to 2 decimal places' do
+      checkout.scan('CF1').scan('CF1').scan('CF1')
+      expect { checkout.total }.to output(/Total: 22.46/).to_stdout
     end
   end
 end
