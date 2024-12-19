@@ -3,11 +3,35 @@
 require_relative '../checkout'
 
 RSpec.describe Checkout do
-  let(:checkout) { described_class.new }
+  let(:pricing_rules) do
+    {
+      'GR1' => {
+        type: 'BOGO',
+        threshold: 2,
+        value: 0
+      },
+      'SR1' => {
+        type: 'price',
+        threshold: 3,
+        value: 4.50
+      },
+      'CF1' => {
+        type: 'percentage',
+        threshold: 3,
+        value: 0.666
+      }
+    }
+  end
+
+  let(:checkout) { described_class.new(pricing_rules) }
 
   describe '#initialize' do
     it 'creates a new instance with empty items' do
       expect(checkout.instance_variable_get(:@items)).to be_empty
+    end
+
+    it 'stores the pricing rules' do
+      expect(checkout.instance_variable_get(:@pricing_rules)).to eq(pricing_rules)
     end
   end
 
@@ -97,6 +121,34 @@ RSpec.describe Checkout do
       it 'calculates correct total for basket with multiple discounts' do
         checkout.scan('GR1').scan('GR1').scan('SR1').scan('SR1').scan('SR1').scan('CF1').scan('CF1').scan('CF1')
         expect { checkout.total }.to output(/.*Total: 27\.86.*/).to_stdout
+      end
+    end
+
+    context 'with items without discount rules' do
+      let(:pricing_rules) { {} }
+
+      it 'applies no discount when rules are empty' do
+        checkout.scan('GR1').scan('GR1')
+        expect { checkout.total }.to output(/.*Total: 6\.22.*/).to_stdout
+      end
+    end
+
+    context 'with different pricing rules' do
+      let(:different_pricing_rules) do
+        {
+          'GR1' => {
+            type: 'price',
+            threshold: 2,
+            value: 2.00
+          }
+        }
+      end
+
+      let(:checkout) { described_class.new(different_pricing_rules) }
+
+      it 'applies the new rules correctly' do
+        checkout.scan('GR1').scan('GR1')
+        expect { checkout.total }.to output(/.*Total: 4\.0.*/).to_stdout
       end
     end
   end

@@ -1,34 +1,15 @@
 # frozen_string_literal: true
 
 class Checkout
-
   PRODUCT_PRICES = {
     'GR1' => 3.11,
     'SR1' => 5.00,
     'CF1' => 11.23
   }
 
-  DISCOUNTS={
-    'GR1' => {
-      type: 'buy x get one discount',
-      threshold: 2,
-      value: 0
-    },
-    'SR1' => {
-      type: 'price',
-      threshold: 3,
-      value: 4.50
-    },
-    'CF1' => {
-      type: 'percentage',
-      threshold: 3,
-      value: 0.666
-    }
-  }
-
-
-  def initialize
+  def initialize(pricing_rules)
     @items = []
+    @pricing_rules = pricing_rules
   end
 
   def scan(item)
@@ -57,14 +38,14 @@ class Checkout
   end
 
   def apply_discount(item,price,count)
-    discount = DISCOUNTS[item]
-    return count * price if count < discount[:threshold]
+    discount = @pricing_rules[item]
+    return count * price if !discount || count < discount[:threshold]
     case discount[:type]
     when 'percentage'
       count * (price * (1 - discount[:value]))
     when 'price'
       count * discount[:value]
-    when 'buy x get one discount'
+    when 'BOGO'
       (count - (count/discount[:threshold]).ceil) * price
     else
       count * price
