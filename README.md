@@ -60,3 +60,81 @@ value: 0.666
 }
 }
 ```
+
+# Setup and Installation
+
+## Prerequisites
+
+* Ruby 3.0+
+* Bundler gem
+
+### Installation Steps
+
+1. Clone this repository 
+```
+https://github.com/jg597b/Kantox_CC.git
+```
+
+2. Install dependencies:
+```
+bundle install
+```
+
+### Running the Tests
+We use RSpec for testing
+
+1. Run all tests
+```
+bundle exec rspec
+```
+2. Run specific test file
+```
+bundle exec rspec spec/checkout_spec.rb 
+```
+
+### Adding these classes to your interface
+
+```
+irb
+```
+
+Once in irb you can add it to your interface
+```
+load 'checkout.rb'
+```
+
+Define the Pricing rules
+```
+PRICING_RULES={
+'GR1' => {
+type: 'BOGO',
+threshold: 2,
+value: 0
+},
+'SR1' => {
+type: 'price',
+threshold: 3,
+value: 4.50
+},
+'CF1' => {
+type: 'percentage',
+threshold: 3,
+value: 0.666
+}
+}
+```
+
+Create a new checkout object
+```
+co=Checkout.new(PRICING_RULES)
+
+```
+
+add items to your basket
+```
+co.scan('CF1').scan('CF1').scan('CF1')
+```
+See the total
+```
+co.total
+```
