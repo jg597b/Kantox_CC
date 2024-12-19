@@ -1,14 +1,9 @@
 # frozen_string_literal: true
+
 require './pricing_rules'
 
 RSpec.describe PricingRules do
-  let(:valid_pricing_rules) do
-    {
-      'GR1' => { type: 'BOGO', threshold: 2, value: 0 },
-      'SR1' => { type: 'price', threshold: 3, value: 4.50 },
-      'CF1' => { type: 'percentage', threshold: 3, value: 2/3.0 }
-    }
-  end
+  include_context 'checkout system'
 
   describe '#initialize' do
     context 'with valid rules' do
@@ -20,7 +15,7 @@ RSpec.describe PricingRules do
     context 'with invalid rules' do
       it 'raises error when rules is not a hash' do
         expect { described_class.new([]) }
-          .to raise_error(ArgumentError, "Pricing rules must be a Hash.")
+          .to raise_error(ArgumentError, 'Pricing rules must be a Hash.')
       end
 
       it 'raises error for invalid product key type' do
@@ -90,61 +85,15 @@ RSpec.describe PricingRules do
 
     it 'raises error for unknown product' do
       expect { pricing_rules.price_for('XXX') }
-        .to raise_error(ArgumentError, "Unknown product: XXX")
+        .to raise_error(ArgumentError, 'Unknown product: XXX')
     end
   end
 
   describe '#apply_discount' do
     let(:pricing_rules) { described_class.new(valid_pricing_rules) }
-
-    context 'with BOGO discount' do
-      it 'applies no discount for single item' do
-        expect(pricing_rules.apply_discount('GR1', 1)).to eq(3.11)
-      end
-
-      it 'applies BOGO discount for two items' do
-        expect(pricing_rules.apply_discount('GR1', 2)).to eq(3.11)
-      end
-
-      it 'applies BOGO discount for three items' do
-        expect(pricing_rules.apply_discount('GR1', 3)).to eq(6.22)
-      end
-
-      it 'applies BOGO discount for four items' do
-        expect(pricing_rules.apply_discount('GR1', 4)).to eq(6.22)
-      end
+    it_behaves_like 'discount application' do
+      let(:pricing_rules) { described_class.new(valid_pricing_rules) }
     end
-
-    context 'with price discount' do
-      it 'applies no discount below threshold' do
-        expect(pricing_rules.apply_discount('SR1', 2)).to eq(10.00)
-      end
-
-      it 'applies price discount at threshold' do
-        expect(pricing_rules.apply_discount('SR1', 3)).to eq(13.50)
-      end
-
-      it 'applies price discount above threshold' do
-        expect(pricing_rules.apply_discount('SR1', 4)).to eq(18.00)
-      end
-    end
-
-    context 'with percentage discount' do
-      it 'applies no discount below threshold' do
-        expect(pricing_rules.apply_discount('CF1', 2)).to eq(22.46)
-      end
-
-      it 'applies percentage discount at threshold' do
-        expected = (3 * 11.23 * 2/3.0).round(2)
-        expect(pricing_rules.apply_discount('CF1', 3).round(2)).to eq(expected)
-      end
-
-      it 'applies percentage discount above threshold' do
-        expected = (4 * 11.23 * 2/3.0).round(2)
-        expect(pricing_rules.apply_discount('CF1', 4).round(2)).to eq(expected)
-      end
-    end
-
     context 'with no discount rule' do
       let(:no_discount_rules) do
         {

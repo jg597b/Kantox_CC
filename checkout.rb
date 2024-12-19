@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require './pricing_rules'
 
 class Checkout
@@ -20,15 +21,15 @@ class Checkout
 
   def calculate_total
     return 0 if @items.empty?
-    total=0
-    grouped_items=@items.group_by { |item| item }
+
+    total = 0
+    grouped_items = @items.group_by { |item| item }
     grouped_items.each do |item, type|
       count = type.count
-      discount = @pricing_rules.apply_discount(item,count)
-      total+=discount
+      discount = @pricing_rules.apply_discount(item, count)
+      total += discount
       puts "#{item}: #{count}   Subtotal for #{item}: #{discount.round(2)} "
     end
     puts "Total: #{total.round(2)}"
   end
-
 end
